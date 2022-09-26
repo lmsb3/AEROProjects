@@ -2,6 +2,18 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 
+def simpson(a, b, n, input_array):
+    sum = 0
+    for k in range(n + 1):
+        summand = input_array[k]
+        if (k != 0) and (k != n):
+            summand *= (2 + (2 * (k % 2)))
+        sum += summand
+    # sum = np.sum(
+    #     [input_array[k] * (2 + (2 * (k % 2))) if (k != 0 and k != n) else input_array[k]] for k in range(n + 1)) possible alterante method
+    return ((b - a) / (3 * n)) * sum
+
+
 def q_dot_calc_analytical(C, D, alphas):
     return -k*Ac*alphas*(C*np.cosh(alphas*L)+D*np.sinh(alphas*L))
 
@@ -14,11 +26,12 @@ def analytical_sol(C, D, alphas, case_num, plot=True, x_len=100):
     x = np.array([np.linspace(0, 1, x_len)])
     T = C*np.sinh(alphas.T*x)+D*np.cosh(alphas.T*x)
     qps = q_dot_calc_analytical(C, D, alphas.T)
+    print(qps)
     if plot:
         plt.figure()
         plt.title('Analytical, Case {}'.format(case_num))
-        plt.xlabel('Distance (cm)')
-        plt.ylabel('Temperature (deg C)')
+        plt.xlabel('X')
+        plt.ylabel('Temperature')
         plt.plot(np.array([np.linspace(0, 1, x_len)] * len(T)).T, T.T)
         plt.legend(['a = {}'.format(a) for a in alphas[0]])
     return x, T, qps
@@ -79,8 +92,8 @@ def FDM_mult_alphas(case_func, n, alphas, find_q=False, plot=False, case_num=1):
     results = []
     if plot:
         plt.figure()
-        plt.ylabel('Temperature (deg C)')
-        plt.xlabel('Distance (cm)')
+        plt.ylabel('Temperature')
+        plt.xlabel('Distance')
         plt.title('FDM Case {} n = {}'.format(case_num, n))
 
     for alpha in alphas:
@@ -100,7 +113,7 @@ def FDM_mult_n(case_func, ns, alpha, find_q=False, plot=False, case_num=1):
         plt.figure()
         plt.legend(loc='upper left')
         plt.ylabel('Temperature')
-        plt.xlabel('Distance (cm)')
+        plt.xlabel('Distance')
         plt.title('FDM Case {} a = {}'.format(case_num, alpha))
 
     for n in ns:
@@ -111,14 +124,13 @@ def FDM_mult_n(case_func, ns, alpha, find_q=False, plot=False, case_num=1):
     return results
 
 
-def roc_to_extrap(values, case_num=1):
+def roc_to_extrap(values):
     q_mesh = values[:-2]
     q_half_mesh = values[1:-1]
     q_quarter_mesh = values[2:]
     extrap = (q_half_mesh**2 - q_mesh*q_quarter_mesh)/(2*q_half_mesh-q_quarter_mesh-q_mesh)
     roc = np.log2((extrap-q_mesh)/(extrap-q_half_mesh))
-    print('Extrapolated values Case {}:\n{}'.format(case_num, extrap))
-    return roc, np.abs((extrap-values[2:])/extrap)
+    return roc, np.abs((extrap-values[:-2])/extrap)
 
 
 def roc_to_exact(values, exact):
@@ -168,28 +180,22 @@ if __name__ == '__main__':
     c3 = FDM_mult_alphas(case3_FDM, n, alphas[0], plot=plotting, case_num=3)
 
     # Richardson for Problem 2
-    # Case 1 FDM
     q1 = np.array([result[-1]
                    for result in FDM_mult_n(case1_FDM, ns, alpha, find_q=True)])
-    print('q Case 1 ', end='')
     roc_q1, perr_q1 = roc_to_extrap(q1)
     roc_q1_exact, perr_q1_exact = roc_to_exact(q1, q1_ana[7])
-    # Case 2 FDM
+
     T02_fdm, q2 = np.array([np.array([result[1][0], result[-1]])
                             for result in FDM_mult_n(case2_FDM, ns, alpha, find_q=True)]).T
-    print('q Case 2 ', end='')
     roc_q2, perr_q2 = roc_to_extrap(q2)
     roc_q2_exact, perr_q2_exact = roc_to_exact(q2, q2_ana[7])
-    print('T(0) Case 2 ', end='')
     roc_T2, perr_T2 = roc_to_extrap(T02_fdm)
     roc_T2_exact, perr_T2_exact = roc_to_exact(T02_fdm, T2_ana[7][0])
-    # Case 3 FDM
+
     T03_fdm, q3 = np.array([np.array([result[1][0], result[-1]])
                             for result in FDM_mult_n(case3_FDM, ns, alpha, find_q=True)]).T
-    print('q Case 3 ', end='')
     roc_q3, perr_q3 = roc_to_extrap(q3)
     roc_q3_exact, perr_q3_exact = roc_to_exact(q3, q3_ana[7])
-    print('T(0) Case 3 ', end='')
     roc_T3, perr_T3 = roc_to_extrap(T03_fdm)
     roc_T3_exact, perr_T3_exact = roc_to_exact(T03_fdm, T3_ana[7][0])
 
@@ -222,9 +228,9 @@ if __name__ == '__main__':
         plt.title('Rate of Convergence of q to extrapolated q')
         plt.xlabel('dx')
         plt.ylabel('Percent Error')
-        plt.loglog(dxs[2:], perr_q1, label='Case 1')
-        plt.loglog(dxs[2:], perr_q2, '--', label='Case 2')
-        plt.loglog(dxs[2:], perr_q3, ':', label='Case 3')
+        plt.loglog(dxs[:-2], perr_q1, label='Case 1')
+        plt.loglog(dxs[:-2], perr_q2, '--', label='Case 2')
+        plt.loglog(dxs[:-2], perr_q3, ':', label='Case 3')
         plt.legend()
         plt.figure()
         plt.title('Rate of Convergence of q to exact')
@@ -238,8 +244,8 @@ if __name__ == '__main__':
         plt.title('Rate of Convergence of T(0) to extrapolated T(0)')
         plt.xlabel('dx')
         plt.ylabel('Percent Error')
-        plt.loglog(dxs[2:], perr_T2, label='Case 2')
-        plt.loglog(dxs[2:], perr_T3, '--', label='Case 3')
+        plt.loglog(dxs[:-2], perr_T2, label='Case 2')
+        plt.loglog(dxs[:-2], perr_T3, '--', label='Case 3')
         plt.legend()
         plt.figure()
         plt.title('Rate of Convergence of T(0) to exact T(0)')
@@ -251,22 +257,18 @@ if __name__ == '__main__':
         plt.show()
 
     # Printing Data
-    np.set_printoptions(suppress=True)
     print('Alpha Values:\n{}'.format(alphas))
     print('-'*51)
     print('-'*15, 'Analytical Solution', '-'*15)
     print('-'*51)
     x = np.array([np.linspace(0, 1, 11)])
     print('X values: \n{}'.format(x[0]))
-    T1 = analytical_sol(C_c1, D_c1, alphas, 1, x_len=11)[1]
+    T1 = analytical_sol(C_c1, D_c1, alphas, 1, x_len=10)
     print('Temperature Case 1:\n{}'.format(T1))
-    T2 = analytical_sol(C_c2, D_c2, alphas, 2, x_len=11)[1]
+    T2 = analytical_sol(C_c2, D_c2, alphas, 2, x_len=10)
     print('Temperature Case 2:\n{}'.format(T2))
-    T3 = analytical_sol(C_c3, D_c3, alphas, 3, x_len=11)[1]
+    T3 = analytical_sol(C_c3, D_c3, alphas, 3, x_len=10)
     print('Temperature Case 3:\n{}'.format(T3))
-    print('q Case 1:\n{}'.format(q1_ana))
-    print('q Case 2:\n{}'.format(q2_ana))
-    print('q Case 3:\n{}'.format(q3_ana))
 
     print('-' * 58)
     print('-' * 11, 'Finite Difference Method Solution', '-' * 11)
@@ -283,38 +285,38 @@ if __name__ == '__main__':
     print('-' * 58)
     print('-' * 18, 'Convergence of T(0)', '-' * 18)
     print('-' * 58)
-    print('dxs:\n{}'.format(dxs))
-    print('T(0) Case 2 exact: {}'.format(T2[7][0]))
+    print('T(0) Case 2 exact: {}'.format(T2[0]))
     print('T(0) Case 2 FDM:\n{}'.format(T02_fdm))
-    print('Percent Error Case 2 wrt exact:\n{}'.format(perr_T2_exact))
-    print('Percent Error Case 2 wrt extrap:\n{}'.format(perr_T2))
-    print('Rate of Convergence wrt extrap case 2:\n{}'.format(roc_T2))
-    print('Rate of Convergence wrt exact case 2:\n{}'.format(roc_T2_exact))
-    print('T(0) Case 3 exact: {}'.format(T3[7][0]))
+    print('T(0) Case 3 exact: {}'.format(T3[0]))
     print('T(0) Case 3 FDM:\n{}'.format(T03_fdm))
-    print('Percent Error Case 3 wrt exact:\n{}'.format(perr_T3_exact))
-    print('Percent Error Case 3 wrt extrap:\n{}'.format(perr_T3))
-    print('Rate of Convergence wrt extrap case 3:\n{}'.format(roc_T3))
-    print('Rate of Convergence wrt exact case 3:\n{}'.format(roc_T3_exact))
 
-    print('-' * 58)
-    print('-' * 18, 'Convergence of q', '-' * 18)
-    print('-' * 58)
-    print('dxs:\n{}'.format(dxs))
-    print('q Case 1:\n{}'.format(q1))
-    print('q Case 2:\n{}'.format(q2))
-    print('q Case 3:\n{}'.format(q3))
-    print('Percent Error q1 fdm wrt extrap:\n{}'.format(perr_q1))
-    print('Percent Error q1 fdm wrt exact:\n{}'.format(perr_q1_exact))
-    print('Rate of Convergence wrt extrap case 1:\n{}'.format(roc_q1))
-    print('Rate of Convergence wrt exact case 1:\n{}'.format(roc_q1_exact))
-    print('Percent Error q2 fdm wrt extrap:\n{}'.format(perr_q2))
-    print('Percent Error q2 fdm wrt exact:\n{}'.format(perr_q2_exact))
-    print('Rate of Convergence wrt extrap case 2:\n{}'.format(roc_q2))
-    print('Rate of Convergence wrt exact case 2:\n{}'.format(roc_q2_exact))
-    print('Percent Error q3 fdm wrt extrap:\n{}'.format(perr_q3))
-    print('Percent Error q3 fdm wrt exact:\n{}'.format(perr_q3_exact))
-    print('Rate of Convergence wrt extrap case 3:\n{}'.format(roc_q3))
-    print('Rate of Convergence wrt exact case 3:\n{}'.format(roc_q3_exact))
-
-
+    # Problem 3
+    # Ais = np.array([np.array(range(2**n+1)) % 2 * 2.0 + 2 for n in ns], dtype=object)
+    # for i in range(len(Ais)):
+    #     Ais[i][0] = 1
+    #     Ais[i][-1] = 1
+    # Ais *= dxs/3.0
+    # h_p3 = 4 ** 2 * k * Ac / A_surface * dxs
+    # # Case 1
+    # T1_fdms = np.array([result[1] for result in FDM_mult_n(case1_FDM, ns, 4)], dtype=object)
+    # qp_1 = np.array([2 * np.pi * h_p3[i] * np.dot(Ais[i], T1_fdms[i]) for i in range(len(ns))])
+    # b, pe = roc_to_extrap(qp_1)
+    # plt.figure()
+    # plt.loglog(dxs[2:], pe)
+    #
+    #
+    # # Case 2
+    # T2_fdms = np.array([result[1] for result in FDM_mult_n(case2_FDM, ns, 4)], dtype=object)
+    # # 2 * np.pi * h[5][0] * np.dot(Ai, T2_fdm)
+    # qp_2 = np.array([2 * np.pi * h_p3[i] * np.dot(Ais[i], T2_fdms[i]) for i in range(len(ns))])
+    # b, pe = roc_to_extrap(qp_2)
+    # plt.figure()
+    # plt.loglog(dxs[2:], pe)
+    #
+    # # Case 3
+    # T3_fdms = np.array([result[1] for result in FDM_mult_n(case3_FDM, ns, 4)], dtype=object)
+    # # 2 * np.pi * h[5][0] * np.dot(Ai, T3_fdm)
+    # qp_3 = np.array([2 * np.pi * h_p3[i] * np.dot(Ais[i], T3_fdms[i]) for i in range(len(ns))])
+    # b, pe = roc_to_extrap(qp_3)
+    # plt.figure()
+    # plt.loglog(dxs[2:], pe)
